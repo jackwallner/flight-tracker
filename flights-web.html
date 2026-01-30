@@ -1,0 +1,603 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>✈️ Overhead Flight Tracker</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+      min-height: 100vh;
+      padding: 20px;
+      color: #fff;
+    }
+    
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+    }
+    
+    h1 {
+      font-size: 28px;
+      margin-bottom: 8px;
+      text-align: center;
+    }
+    
+    .subtitle {
+      color: #888;
+      font-size: 14px;
+      margin-bottom: 24px;
+      text-align: center;
+    }
+    
+    .location {
+      color: #00d9ff;
+      font-weight: 500;
+    }
+    
+    .stats {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+      gap: 16px;
+      margin-bottom: 24px;
+    }
+    
+    .stat-card {
+      background: rgba(255,255,255,0.05);
+      padding: 16px;
+      border-radius: 12px;
+      border: 1px solid rgba(255,255,255,0.1);
+      text-align: center;
+    }
+    
+    .stat-value {
+      font-size: 32px;
+      font-weight: 600;
+      color: #00d9ff;
+    }
+    
+    .stat-label {
+      font-size: 12px;
+      color: #888;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-top: 4px;
+    }
+    
+    /* Current Flight Card - Compact */
+    .current-flight {
+      background: rgba(255,255,255,0.05);
+      border-radius: 16px;
+      padding: 20px;
+      margin-bottom: 20px;
+      text-align: center;
+      backdrop-filter: blur(10px);
+      border: 1px solid rgba(255,255,255,0.1);
+    }
+    
+    .current-flight.tracking {
+      border-color: #00d9ff;
+      box-shadow: 0 0 30px rgba(0,217,255,0.2);
+    }
+    
+    .current-flight.overhead {
+      border-color: #ff6b35;
+      animation: pulse 2s infinite;
+    }
+    
+    @keyframes pulse {
+      0%, 100% { box-shadow: 0 0 30px rgba(255,107,53,0.3); }
+      50% { box-shadow: 0 0 50px rgba(255,107,53,0.5); }
+    }
+    
+    .plane-icon {
+      font-size: 3rem;
+      margin-bottom: 10px;
+    }
+    
+    .flight-callsign {
+      font-size: 2rem;
+      font-weight: bold;
+      margin-bottom: 3px;
+    }
+    
+    .flight-callsign a {
+      color: inherit;
+      text-decoration: none;
+    }
+    
+    .flight-callsign a:hover {
+      text-decoration: underline;
+      opacity: 0.8;
+    }
+    
+    .flight-type {
+      color: #888;
+      font-size: 1rem;
+      margin-bottom: 10px;
+    }
+    
+    .route {
+      font-size: 1.1rem;
+      color: #ffd700;
+      margin-bottom: 15px;
+    }
+    
+    .current-stats {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 10px;
+      margin-bottom: 10px;
+    }
+    
+    .current-stat {
+      background: rgba(0,0,0,0.3);
+      padding: 10px 5px;
+      border-radius: 10px;
+    }
+    
+    .current-stat-value {
+      font-size: 1.4rem;
+      font-weight: bold;
+      color: #00d9ff;
+    }
+    
+    .current-stat-label {
+      font-size: 0.7rem;
+      color: #888;
+      margin-top: 3px;
+    }
+    
+    /* Flight History Table */
+    .section-title {
+      font-size: 1.2rem;
+      margin: 30px 0 15px 0;
+      color: #888;
+    }
+    
+    table {
+      width: 100%;
+      background: rgba(255,255,255,0.05);
+      border-radius: 12px;
+      overflow: hidden;
+      border-collapse: collapse;
+      border: 1px solid rgba(255,255,255,0.1);
+    }
+    
+    th, td {
+      padding: 12px 16px;
+      text-align: left;
+      border-bottom: 1px solid rgba(255,255,255,0.1);
+    }
+    
+    th {
+      background: rgba(255,255,255,0.05);
+      font-weight: 600;
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: #888;
+    }
+    
+    tr:hover {
+      background: rgba(255,255,255,0.05);
+    }
+    
+    .flight-num {
+      font-family: 'SF Mono', Monaco, monospace;
+      font-weight: 600;
+    }
+    
+    .flight-num a {
+      color: #00d9ff;
+      text-decoration: none;
+    }
+    
+    .flight-num a:hover {
+      text-decoration: underline;
+    }
+    
+    .distance {
+      font-weight: 600;
+    }
+    
+    .distance-close {
+      color: #ff6b35;
+    }
+    
+    .distance-mid {
+      color: #ffd700;
+    }
+    
+    .distance-far {
+      color: #4caf50;
+    }
+    
+    .aircraft {
+      color: #888;
+      font-size: 13px;
+    }
+    
+    .route-small {
+      color: #aaa;
+      font-size: 13px;
+    }
+    
+    .time {
+      color: #888;
+      font-size: 13px;
+    }
+    
+    .empty {
+      text-align: center;
+      padding: 60px 20px;
+      color: #666;
+    }
+    
+    .waiting {
+      text-align: center;
+      padding: 40px;
+    }
+    
+    .radar {
+      width: 100px;
+      height: 100px;
+      border: 2px solid rgba(0,217,255,0.3);
+      border-radius: 50%;
+      margin: 0 auto 20px;
+      position: relative;
+    }
+    
+    .radar-sweep {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      width: 50%;
+      height: 2px;
+      background: linear-gradient(90deg, transparent, #00d9ff);
+      transform-origin: left center;
+      animation: sweep 2s linear infinite;
+    }
+    
+    @keyframes sweep {
+      from { transform: rotate(0deg); }
+      to { transform: rotate(360deg); }
+    }
+    
+    .timestamp {
+      color: #666;
+      font-size: 0.75rem;
+      margin-top: 20px;
+      text-align: center;
+    }
+    
+    .refresh-indicator {
+      position: fixed;
+      top: 20px;
+      right: 20px;
+      width: 10px;
+      height: 10px;
+      background: #4caf50;
+      border-radius: 50%;
+      opacity: 0;
+      transition: opacity 0.3s;
+    }
+    
+    .refresh-indicator.active {
+      opacity: 1;
+    }
+    
+    @media (max-width: 768px) {
+      .current-stats {
+        grid-template-columns: repeat(2, 1fr);
+      }
+      
+      table {
+        font-size: 12px;
+      }
+      
+      th, td {
+        padding: 8px 10px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>✈️ Overhead Flight Tracker</h1>
+    <p class="subtitle">
+      <span class="location">📍 Vancouver, WA — 2NM Zone</span> • 
+      Live tracking
+    </p>
+    
+    <div class="stats">
+      <div class="stat-card">
+        <div class="stat-value" id="total-flights">-</div>
+        <div class="stat-label">Total Flights</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value" id="closest-flight">-</div>
+        <div class="stat-label">Closest (nm)</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value" id="today-flights">-</div>
+        <div class="stat-label">Today</div>
+      </div>
+    </div>
+
+    <!-- Current Flight Card -->
+    <div id="current-flight" class="current-flight waiting">
+      <div class="radar">
+        <div class="radar-sweep"></div>
+      </div>
+      <p>Waiting for flights...</p>
+    </div>
+    
+    <!-- Flight History Table -->
+    <h2 class="section-title">📚 Flight History</h2>
+    <div id="history-table">
+      <div class="empty">Loading...</div>
+    </div>
+    
+    <div class="timestamp" id="timestamp">Last updated: --</div>
+  </div>
+  
+  <div class="refresh-indicator" id="refresh-indicator"></div>
+
+  <script>
+    let lastData = null;
+    let flightHistory = [];
+    
+    function formatTime(isoString) {
+      if (!isoString) return '--';
+      const date = new Date(isoString);
+      return date.toLocaleString('en-US', {
+        month: 'short',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit'
+      });
+    }
+    
+    function formatDuration(seconds) {
+      if (!seconds) return '-';
+      if (seconds < 60) return `${seconds}s`;
+      const mins = Math.floor(seconds / 60);
+      const secs = seconds % 60;
+      return `${mins}m ${secs}s`;
+    }
+    
+    function getDistanceClass(nm) {
+      if (nm < 0.5) return 'distance-close';
+      if (nm < 1.5) return 'distance-mid';
+      return 'distance-far';
+    }
+    
+    function updateStats() {
+      document.getElementById('total-flights').textContent = flightHistory.length;
+      
+      const closest = flightHistory.length > 0 
+        ? Math.min(...flightHistory.map(f => f.closestDistance || f.distance || 999)).toFixed(2)
+        : '-';
+      document.getElementById('closest-flight').textContent = closest;
+      
+      const today = new Date().toDateString();
+      const todayCount = flightHistory.filter(f => {
+        const date = new Date(f.firstSeen || f.timestamp);
+        return date.toDateString() === today;
+      }).length;
+      document.getElementById('today-flights').textContent = todayCount;
+    }
+    
+    function renderCurrentFlight(data) {
+      const card = document.getElementById('current-flight');
+      
+      if (data.status === 'waiting') {
+        card.className = 'current-flight waiting';
+        card.innerHTML = `
+          <div class="radar">
+            <div class="radar-sweep"></div>
+          </div>
+          <p>Waiting for flights...</p>
+        `;
+        return;
+      }
+      
+      const flight = data.flight || {};
+      const approach = data.closestApproach || {};
+      const distance = approach.distance || 0;
+      
+      // Update card style
+      card.className = 'current-flight';
+      if (data.isOverhead) {
+        card.classList.add('overhead');
+      } else if (data.status === 'tracking') {
+        card.classList.add('tracking');
+      }
+      
+      const distanceClass = getDistanceClass(distance);
+      
+      card.innerHTML = `
+        <div class="plane-icon">✈️</div>
+        <div class="flight-callsign">
+          <a href="https://www.flightradar24.com/${flight.callsign || ''}" target="_blank" rel="noopener">
+            ${flight.callsign || 'UNKNOWN'}
+          </a>
+        </div>
+        <div class="flight-type">${flight.aircraftType || 'Unknown Aircraft'}</div>
+        <div class="route">${flight.origin || '???'} → ${flight.destination || '???'}</div>
+        
+        <div class="current-stats">
+          <div class="current-stat">
+            <div class="current-stat-value ${distanceClass}">${approach.distance?.toFixed(2) || '--'}</div>
+            <div class="current-stat-label">nautical miles</div>
+          </div>
+          <div class="current-stat">
+            <div class="current-stat-value">${approach.altitude?.toLocaleString() || '--'}</div>
+            <div class="current-stat-label">feet altitude</div>
+          </div>
+          <div class="current-stat">
+            <div class="current-stat-value">${approach.speed || '--'}</div>
+            <div class="current-stat-label">knots speed</div>
+          </div>
+          <div class="current-stat">
+            <div class="current-stat-value">${approach.precision === 'high' ? '✓' : approach.precision === 'tracked' ? '~' : '?'}</div>
+            <div class="current-stat-label">${approach.precision || 'unknown'} precision</div>
+          </div>
+        </div>
+        
+        <div class="timestamp">${data.status === 'completed' ? '✓ Completed' : '● Tracking'} • Updated: ${formatTime(data.timestamp)}</div>
+      `;
+    }
+    
+    function renderHistoryTable() {
+      const container = document.getElementById('history-table');
+      
+      if (flightHistory.length === 0) {
+        container.innerHTML = '<div class="empty">No flights in history yet</div>';
+        return;
+      }
+      
+      // Sort by most recent first
+      const sortedFlights = [...flightHistory].sort((a, b) => 
+        new Date(b.lastSeen || b.firstSeen || b.timestamp) - new Date(a.lastSeen || a.firstSeen || a.timestamp)
+      );
+      
+      const rows = sortedFlights.slice(0, 50).map(f => {
+        const distance = f.closestDistance || f.distance || 0;
+        const distClass = getDistanceClass(distance);
+        const duration = formatDuration(f.duration);
+        
+        return `
+          <tr>
+            <td class="flight-num">
+              <a href="https://www.flightradar24.com/${f.callsign || ''}" target="_blank" rel="noopener">
+                ${f.callsign || 'N/A'}
+              </a>
+            </td>
+            <td class="aircraft">${f.aircraftType || '?'}</td>
+            <td class="route-small">${f.origin || '?'} → ${f.destination || '?'}</td>
+            <td class="distance ${distClass}">${distance.toFixed(2)}</td>
+            <td>${f.closestAltitude ? f.closestAltitude.toLocaleString() : (f.altitude ? Math.round(f.altitude) : '-')}</td>
+            <td>${f.closestSpeed || f.speed || '-'}</td>
+            <td class="time">${formatTime(f.firstSeen)}</td>
+            <td>${duration}</td>
+          </tr>
+        `;
+      }).join('');
+      
+      container.innerHTML = `
+        <table>
+          <thead>
+            <tr>
+              <th>Flight</th>
+              <th>Aircraft</th>
+              <th>Route</th>
+              <th>Closest</th>
+              <th>Alt (ft)</th>
+              <th>Speed</th>
+              <th>First Seen</th>
+              <th>Duration</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${rows}
+          </tbody>
+        </table>
+      `;
+    }
+    
+    async function fetchData() {
+      const indicator = document.getElementById('refresh-indicator');
+      indicator.classList.add('active');
+      
+      try {
+        // Fetch current flight data
+        const response = await fetch(`flights-web.json?t=${Date.now()}`);
+        if (!response.ok) throw new Error('Failed to fetch');
+        
+        const data = await response.json();
+        
+        // Only re-render current flight if data changed
+        const dataStr = JSON.stringify(data);
+        if (dataStr !== lastData) {
+          lastData = dataStr;
+          renderCurrentFlight(data);
+          
+          // Add to history if it's a completed flight with a callsign
+          if (data.flight?.callsign && data.status === 'completed') {
+            const existing = flightHistory.find(f => f.callsign === data.flight.callsign);
+            if (!existing) {
+              flightHistory.push({
+                callsign: data.flight.callsign,
+                aircraftType: data.flight.aircraftType,
+                origin: data.flight.origin,
+                destination: data.flight.destination,
+                closestDistance: data.closestApproach?.distance,
+                closestAltitude: data.closestApproach?.altitude,
+                closestSpeed: data.closestApproach?.speed,
+                firstSeen: data.closestApproach?.timestamp,
+                lastSeen: data.timestamp,
+                duration: data.pathSnapshots * 20 // Approximate duration
+              });
+              updateStats();
+              renderHistoryTable();
+            }
+          }
+        }
+        
+        // Also try to load full history from flights.json
+        try {
+          const historyResponse = await fetch(`flights.json?t=${Date.now()}`);
+          if (historyResponse.ok) {
+            const historyData = await historyResponse.json();
+            if (Array.isArray(historyData) && historyData.length > flightHistory.length) {
+              flightHistory = historyData;
+              updateStats();
+              renderHistoryTable();
+            }
+          }
+        } catch (e) {
+          // Silent fail - history is optional
+        }
+        
+      } catch (err) {
+        console.log('Fetch error:', err.message);
+      } finally {
+        setTimeout(() => indicator.classList.remove('active'), 300);
+      }
+    }
+    
+    // Initial fetch
+    fetchData();
+    
+    // Also try to load history immediately for the table
+    async function loadInitialHistory() {
+      try {
+        const historyResponse = await fetch(`flights.json?t=${Date.now()}`);
+        if (historyResponse.ok) {
+          const historyData = await historyResponse.json();
+          if (Array.isArray(historyData) && historyData.length > 0) {
+            flightHistory = historyData;
+            updateStats();
+            renderHistoryTable();
+          }
+        }
+      } catch (e) {
+        console.log('Initial history load failed:', e.message);
+      }
+    }
+    loadInitialHistory();
+    
+    // Poll every 5 seconds
+    setInterval(fetchData, 5000);
+  </script>
+</body>
+</html>
