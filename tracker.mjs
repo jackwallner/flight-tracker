@@ -7,17 +7,92 @@
 
 import { fetchFR24Flights } from './api-fr24.mjs';
 import * as awtrix from '../ulanzi-clock/channel.mjs';
+import fs from 'fs';
+import path from 'path';
 
 const CONFIG = {
   lat: parseFloat(process.env.TRACKER_LAT) || 0.0,  // Set via TRACKER_LAT env var
   lon: parseFloat(process.env.TRACKER_LON) || 0.0,  // Set via TRACKER_LON env var
-  radiusNm: parseInt(process.env.TRACKER_RADIUS_NM) || 3,   // 3NM - overhead zone
+  radiusNm: parseInt(process.env.TRACKER_RADIUS_NM) || 2,   // 2NM - overhead zone
   pollIntervalSec: parseInt(process.env.POLL_INTERVAL) || 20,
-  displayDuration: 5  // Seconds per info screen
+  displayDuration: 5,  // Seconds per info screen
+  flightsLogPath: process.env.FLIGHTS_LOG_PATH || './flights.json'
 };
 
 let lastFlightCallsign = null;
 let isRunning = true;
+let flightHistory = new Map(); // Track flights with their closest approach
+
+/**
+ * Load existing flight history from file
+ */
+function loadFlightHistory() {
+  try {
+    if (fs.existsSync(CONFIG.flightsLogPath)) {
+      const data = JSON.parse(fs.readFileSync(CONFIG.flightsLogPath, 'utf8'));
+      data.forEach(f => flightHistory.set(f.callsign, f));
+      console.log(`📚 Loaded ${data.length} flights from history`);
+    }
+  } catch (err) {
+    console.error('Error loading flight history:', err.message);
+  }
+}
+
+/**
+ * Save flight history to file
+ */
+function saveFlightHistory() {
+  try {
+    const data = Array.from(flightHistory.values());
+    fs.writeFileSync(CONFIG.flightsLogPath, JSON.stringify(data, null, 2));
+  } catch (err) {
+    console.error('Error saving flight history:', err.message);
+  }
+}
+
+/**
+ * Update flight tracking data
+ */
+function trackFlight(flight) {
+  const existing = flightHistory.get(flight.callsign);
+  const now = new Date().toISOString();
+  
+  if (existing) {
+    // Update existing flight
+    existing.lastSeen = now;
+    existing.duration = Math.round((new Date(now) - new Date(existing.firstSeen)) / 1000);
+    if (flight.distance < existing.closestDistance) {
+      existing.closestDistance = flight.distance;
+      existing.closestAltitude = flight.altitude;
+      existing.closestSpeed = flight.speed;
+    }
+    // Update route info if we got it
+    if (flight.origin && !existing.origin) existing.origin = flight.origin;
+    if (flight.destination && !existing.destination) existing.destination = flight.destination;
+    if (flight.flightNumber && !existing.flightNumber) existing.flightNumber = flight.flightNumber;
+  } else {
+    // New flight
+    flightHistory.set(flight.callsign, {
+      callsign: flight.callsign,
+      flightNumber: flight.flightNumber || null,
+      aircraftType: flight.type || null,
+      origin: flight.origin || null,
+      destination: flight.destination || null,
+      firstSeen: now,
+      lastSeen: now,
+      duration: 0,
+      closestDistance: flight.distance,
+      closestAltitude: flight.altitude,
+      closestSpeed: flight.speed,
+      initialDistance: flight.distance,
+      initialAltitude: flight.altitude,
+      initialSpeed: flight.speed
+    });
+    console.log(`📝 Logged new flight: ${flight.callsign}`);
+  }
+  
+  saveFlightHistory();
+}
 
 /**
  * Get color based on altitude (meaningful color coding)
@@ -185,7 +260,11 @@ async function run() {
   console.log('🛩️  Flight Tracker Starting...');
   console.log(`📍 Location: ${CONFIG.lat}, ${CONFIG.lon}`);
   console.log(`📡 Radius: ${CONFIG.radiusNm}NM`);
-  console.log(`⏱️  Poll: every ${CONFIG.pollIntervalSec}s\n`);
+  console.log(`⏱️  Poll: every ${CONFIG.pollIntervalSec}s`);
+  console.log(`📝 Log: ${CONFIG.flightsLogPath}\n`);
+
+  // Load flight history
+  loadFlightHistory();
 
   // Check AWTRIX health
   const health = await awtrix.health();
@@ -215,6 +294,9 @@ async function run() {
       // Sort by distance, get closest
       flights.sort((a, b) => (a.distance || 999) - (b.distance || 999));
       const closest = flights[0];
+
+      // Track this flight (update history)
+      trackFlight(closest);
 
       // Show flight if NEW, or re-show same flight to keep it visible
       if (closest.callsign !== lastFlightCallsign) {
