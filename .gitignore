@@ -1,0 +1,36 @@
+# Environment variables (contains sensitive coords)
+.env
+.env.local
+
+# Logs
+*.log
+flight-tracker.log
+flight-tracker.error.log
+
+# Node
+node_modules/
+npm-debug.log*
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Service files (local only)
+deploy_to_service.sh
+SERVICE_DEPLOYMENT.md
+
+# Files with local coordinates (keep private)
+flights_mqtt.py
+flights_to_awtrix.py
+index-v2.mjs
+index-closest.mjs
+index.mjs
+SKILL.md
+test.mjs
+test-v2.mjs
