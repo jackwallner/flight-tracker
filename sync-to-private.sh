@@ -4,9 +4,19 @@
 
 set -e
 
+# Look for flights.json in services (where tracker runs) or skills (where we edit)
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PRIVATE_REPO="$SCRIPT_DIR/../my-flights"
-FLIGHTS_FILE="$SCRIPT_DIR/flights.json"
+
+# Check services first (where tracker actually runs), then skills
+if [ -f "$HOME/services/flight-tracker/flights.json" ]; then
+    FLIGHTS_FILE="$HOME/services/flight-tracker/flights.json"
+elif [ -f "$SCRIPT_DIR/flights.json" ]; then
+    FLIGHTS_FILE="$SCRIPT_DIR/flights.json"
+else
+    echo "No flights.json found in services or skills"
+    exit 0
+fi
 
 # Check if flights.json exists
 if [ ! -f "$FLIGHTS_FILE" ]; then
