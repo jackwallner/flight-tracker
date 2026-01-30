@@ -38,7 +38,7 @@ export async function fetchFR24Flights(lat, lon, radiusNm = 15) {
     }
     
     const data = await res.json();
-    return parseFR24Flights(data, lat, lon);
+    return parseFR24Flights(data, lat, lon, radiusNm);
   } catch (err) {
     console.error('FR24 fetch error:', err.message);
     return [];
@@ -49,7 +49,7 @@ export async function fetchFR24Flights(lat, lon, radiusNm = 15) {
  * Parse FR24 response
  * FR24 format: { icao: [icao, lat, lon, heading, alt, speed, squawk, radar, ac_type, reg, timestamp, origin, dest, flight, on_ground, v_speed, callsign, ...] }
  */
-function parseFR24Flights(data, centerLat, centerLon) {
+function parseFR24Flights(data, centerLat, centerLon, radiusNm) {
   const flights = [];
   
   for (const [icao, items] of Object.entries(data)) {
@@ -81,7 +81,10 @@ function parseFR24Flights(data, centerLat, centerLon) {
     
     if (flight.lat && flight.lon) {
       flight.distance = calculateDistance(centerLat, centerLon, flight.lat, flight.lon);
-      flights.push(flight);
+      // Strict radius filtering - only include flights within radius
+      if (flight.distance <= radiusNm) {
+        flights.push(flight);
+      }
     }
   }
   

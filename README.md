@@ -1,80 +1,139 @@
 # Flight Tracker for AWTRIX
 
-Displays real-time aircraft information on your [Ulanzi Smart Pixel Clock](https://www.ulanzi.com/products/ulanzi-smart-pixel-clock-2882) via AWTRIX.
+Real-time aircraft tracking on your [Ulanzi Smart Pixel Clock](https://www.ulanzi.com/products/ulanzi-smart-pixel-clock-2882) via AWTRIX, with GitHub Pages integration for historical data.
 
 ![Flight Tracker Demo](https://img.shields.io/badge/AWTRIX-Compatible-brightgreen)
-![Node.js](https://img.shields.io/badge/Node.js-18%2B-blue)
-
-## Features
-
-- ✈️ Real-time flight tracking via FlightRadar24 API
-- 📍 Configurable location and search radius
-- 🎨 Color-coded by altitude and speed
-- 🔄 4-screen rotation: Airline → Aircraft Type → Departure → Arrival
-- 📡 MQTT-based AWTRIX integration
-- 🔇 Silent when no flights (no "NO FLIGHTS" message cluttering display)
 
 ## Quick Start
 
 ```bash
-# Install dependencies
-npm install
+# Deploy and start
+cd ~/clawd/skills/flight-tracker
+./deploy_to_service.sh
 
-# Configure your location
-cp .env.example .env
-# Edit .env with your coordinates
-
-# Run the tracker
-node tracker.mjs
+# View logs
+tail -f ~/services/flight-tracker/flight-tracker.log
 ```
 
-## Configuration
+## What's Running
 
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `TRACKER_LAT` | *required* | Your latitude |
-| `TRACKER_LON` | *required* | Your longitude |
-| `TRACKER_RADIUS_NM` | 3 | Search radius in nautical miles |
-| `POLL_INTERVAL` | 20 | Poll interval in seconds |
+**`tracker.mjs`** runs as a macOS background service and:
+1. Monitors flights within **2 nautical miles** of Vancouver, WA
+2. Shows them on your AWTRIX clock (5-screen rotation)
+3. Exports data to [your website](https://jackwallner.github.io/my-flights/)
 
-### Finding Your Coordinates
+## AWTRIX Display
 
-1. Go to [Google Maps](https://maps.google.com)
-2. Right-click your location
-3. Click the coordinates to copy
-4. Paste into `.env`
-
-## Display Format
-
-The tracker cycles through 4 screens per flight:
+When a flight enters the 2NM zone, you see 5 screens (5 seconds each):
 
 ```
 ┌────────────────────────┐
-│ UA                     │  ← Airline code (color = altitude)
-│ 738                    │  ← Aircraft type (color = speed)
-│ SFO                    │  ← Departure airport
-│ JFK                    │  ← Arrival airport
+│ AS                     │  ← Screen 1: Airline code (color = altitude)
+│ 1.2NM                  │  ← Screen 2: Distance (cyan)
+│ 737                    │  ← Screen 3: Aircraft type (color = speed)
+│ SMF                    │  ← Screen 4: Departure (gold + takeoff icon)
+│ SEA                    │  ← Screen 5: Arrival (green + landing icon)
 └────────────────────────┘
 ```
 
 **Colors:**
-- Altitude: Orange (low) → Gold → Cyan → Purple (cruise)
-- Speed: Green (slow) → Gold → Orange → Red (fast)
+- **Altitude**: Orange (low) → Gold → Cyan → Purple (cruise)
+- **Speed**: Green (slow) → Gold → Orange → Red (fast)
+- **Distance**: Cyan
+
+## Website
+
+Live at: **https://jackwallner.github.io/my-flights/**
+
+Shows:
+- Flight callsign (clickable → FlightRadar24)
+- Aircraft type (enriched from 520k aircraft database)
+- Closest approach distance
+- Altitude & speed at closest approach
+- Origin → Destination route
+- Precision indicator (✓ = high, ~ = tracked, ? = estimated)
+
+## Aircraft Database
+
+**520,048 aircraft** from [OpenSky Network](https://opensky-network.org/)
+
+Maps ICAO 24-bit addresses to:
+- Aircraft type (B738, A320, etc.)
+- Registration (tail number)
+- Manufacturer and model
+
+## Architecture
+
+See [ARCHITECTURE.md](./ARCHITECTURE.md) for detailed documentation.
 
 ## Files
 
-| File | Purpose |
-|------|---------|
-| `tracker.mjs` | Main tracker loop |
+| Active Files | Purpose |
+|--------------|---------|
+| `tracker.mjs` | Main service - 5-screen AWTRIX display, web export |
 | `api-fr24.mjs` | FlightRadar24 API client |
-| `run.sh` | Quick launcher |
+| `aircraft-db.mjs` | Aircraft database enrichment (520k entries) |
+| `aircraft_db.json` | Full OpenSky aircraft database (53MB) |
+| `flights-web.html` | Website display template (source) |
+| `deploy_to_service.sh` | Deploy code to `~/services/flight-tracker/` |
+| `sync-to-private.sh` | Sync from service dir → GitHub Pages repo |
 
-## Requirements
+**Note:** `flights-web.html` is copied to `~/services/flight-tracker/` during deployment. The sync script reads from the **service directory**, not the skills directory. See Troubleshooting below for the full sync chain.
 
-- Node.js 18+
-- AWTRIX-compatible clock on your network
-- Internet connection (for FR24 API)
+| Archived Files | Reason |
+|----------------|--------|
+| `archive/` | Old implementations, test files, unused scripts |
 
-## License
+## Configuration
 
-MIT
+Set in `~/Library/LaunchAgents/com.jackwallner.flight-tracker.plist`:
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `TRACKER_LAT` | 45.62528 | Your latitude |
+| `TRACKER_LON` | -122.52819 | Your longitude |
+| `TRACKER_RADIUS_NM` | 2 | Detection radius in NM |
+
+## Troubleshooting
+
+**No flights showing?**
+```bash
+# Check if service is running
+launchctl list | grep flight-tracker
+
+# Check logs
+tail -f ~/services/flight-tracker/flight-tracker.log
+```
+
+**Aircraft shows "?" for type?**
+Some flights don't transmit aircraft type. The database now has 520k aircraft to look up by ICAO address, but some private/GA aircraft may still show as unknown.
+
+**Website not updating?**
+```bash
+# Manual sync
+./sync-to-private.sh
+```
+
+**⚠️ Critical: File Sync Chain**
+
+The sync works in this order (checked by `sync-to-private.sh`):
+
+1. **`~/services/flight-tracker/flights-web.html`** ← Source of truth (service reads this)
+2. **↓ copied to**
+3. **`skills/my-flights/index.html`** ← GitHub Pages repo
+4. **↓ git push**
+5. **https://jackwallner.github.io/my-flights/**
+
+If you update `skills/flight-tracker/flights-web.html` but NOT the service directory, the sync will copy the OLD version from `~/services/flight-tracker/` and overwrite your changes.
+
+**After editing HTML in skills/, always copy to service dir:**
+```bash
+cp skills/flight-tracker/flights-web.html ~/services/flight-tracker/
+./sync-to-private.sh
+```
+
+Or re-deploy entirely:
+```bash
+./deploy_to_service.sh  # Copies all files + restarts service
+./sync-to-private.sh    # Syncs to GitHub Pages
+```
